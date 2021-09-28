@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
+    <script src="../scripts/d3.js" type="text/javascript"></script>
+    <style>
+        body{
+            margin: 0;
+        }
+        .line {
+            fill: none;
+            stroke: rgb(231, 117, 79);
+            stroke-width: 3px;
+        }
+
+        #tooltip {
+            position: absolute;
+            width: 150px;
+            height: auto;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            -webkit-border-radius: 10px;
+            -moz-border-radius: 10px;
+            border-radius: 10px;
+            font-style: -webkit-box-shadow: 4px 4px 10px rbga(0, 0, 0, 0.4);
+            -moz-box-shadow: 4px 4px 10px rbga(0, 0, 0, 0.4);
+            box-shadow: 4px 4px 10px rbga(0, 0, 0, 0.4);
+            pointer-events: none;
+        }
+
+        #tooltip.hidden {
+            display: none;
+        }
+
+        #tooltip p {
+            margin: 0;
+            font-family: sans-serif;
+            font-size: 16px;
+            line-height: 20px;
+        }
+        .svg{
+            position: relative;
+        }
+        .c-select {
+            width: 100%;
+            position: absolute;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .c-select select {
+            width: 150px;
+        }
+        .tips{
+            background: rgb(49,47,48);
+            width: 100%;
+            height: 100px;
+            color: white;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        .tips h2{
+            line-height: 100px;
+        }
+        .svg {
+            position: relative;
+            margin-top: 20px;
+        }
+        .svg .director{
+            position: absolute;
+            top: 20px;
+            left: 10px;
+        }
+        .svg .year{
+            position: absolute;
+            bottom: 20px;
+            right: 120px;
+        }
+    </style>
+</head>
+<body>
+<section class="hero is-dark is-bold">
+    <div class="hero-head">
+        <nav class="navbar">
+        <div class="container">
+            <div class="navbar-brand">
+            <a class="navbar-item">
+                <h1 class="title is-4">CS5044 Information Visualisation</h1>
+            </a>
+            </div>
+            <div class="navbar-menu">
+            <div class="navbar-end">
+                <a class="navbar-item" href="../index.html">
+                Home
+                </a>
+                <a href="160015074.html" class="navbar-item">
+                Directors and Actors - 160015074
+                </a>
+                <span class="navbar-item">
+                  Director and Genre - 200015498
+                </span>
+                <a href="200024763.html" class="navbar-item">
+                  Director and Country - 200024763
+                </a>
+            </div>
+            </div>
+        </div>
+        </nav>
+    </div>
+    <div class="hero-body pb-5">
+        <div class="container has-text-centered">
+        <p class="title">
+            Number of directors for different listed_in of types in different years
+        </p>
+        </div>
+    </div>
+    </section>
+<div class="svg">
+    <span class="director">director</span>
+    <span class="year">year</span>
+    <div class="hidden" id="tooltip">
+        <p><strong>year:</strong><span id="tooltip_year">0</span></p>
+        <p><strong>num:</strong><span id="tooltip_count">0</span></p>
+    </div>
+    <div class="c-select">
+        <lable>category:</lable>
+        <select id="listOption">
+            <option value="">none</option>
+        </select>
+    </div>
+</div>
+
+
+<script>
+    //all data
+    var netflixData = [];
+    // get csv data:year number of director
+    var filterData = [];
+    //filtered data 
+    var releaseDataObj = {};
+    var releaseDataArr = [];
+    //all categries
+    var cates = [];
+    //all years
+    var years = [];
+
+
+    d3.selectAll("#listOption").on("change", selectChange)
+    // Sets the range of coordinates 
+    var margin = {top: 50, right: 20, bottom: 30, left: 50},
+        width = document.body.clientWidth-50  - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+    // Sets year
+    d3.select(".year").attr("style","left:"+(width+70)+"px");
+     //Using d3.scalelinear () to create a linear scale 
+    var x = d3.scaleLinear().range([0, width]);
+    var y = d3.scaleLinear().range([height, 0]);
+    console.log("width:" + width + ",height:" + height)
+    //create a line
+    var valueline = d3.line()
+        .x(function (d) {
+            return x(d.year);
+        })
+        .y(function (d) {
+            return y(d.count);
+        });
+    var svg = d3.select(".svg").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g").attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+    //get data
+    d3.csv("../netflix_titles.csv", function (data) {
+        return data
+    }).then(function (data) {
+        data.forEach(function (d) {
+            if (d.director) {
+                netflixData.push(d);
+            }
+        });
+
+        filterData = netflixData;
+        let cateObjs = {};
+        let yearsObj = {};
+        for (let i = 0; i < netflixData.length; i++) {
+            let datum = netflixData[i];
+            let splitArr = datum.listed_in.split(",");
+            for (let j = 0; j < splitArr.length; j++) {
+                cateObjs[splitArr[j].trim()] = 1;
+            }
+            yearsObj[datum.release_year] = 1;
+        }
+        cates = Object.keys(cateObjs);
+        years = Object.keys(yearsObj);
+        d3.select("#listOption").append()
+        var select = d3.select("#listOption").on("change", selectChange),
+            options = select.selectAll('option').data(cates); // Data join
+        options.enter().append("option").text(function (d) {
+            return d;
+        });
+        draw();
+    });
+
+    //once the selectChange 
+    function selectChange(e) {
+        filterData = [];
+        releaseDataObj = [];
+        releaseDataArr = [];
+        years = [];
+        let yearObjs = {};
+        if (e.target.value) {
+            netflixData.forEach(function (d) {
+                if (d.listed_in.indexOf(e.target.value) > -1) {
+                    filterData.push(d)
+                    yearObjs[d.release_year] = 1;
+                }
+            });
+        } else {
+            filterData = netflixData;
+            filterData.forEach(function (d) {
+                yearObjs[d.release_year] = 1;
+            });
+        }
+        years = Object.keys(yearObjs);
+        console.log(years)
+        console.log(filterData)
+        draw();
+    }
+
+    function draw() {
+        //remove data
+        d3.selectAll("svg g > *").remove();
+        // formatted data
+        filterData.forEach(function (d) {
+            if (d.director) {
+                releaseDataObj[d.release_year] = releaseDataObj[d.release_year] ? releaseDataObj[d.release_year] + 1 : 1;
+            }
+        });
+        for (let year in releaseDataObj) {
+            let obj = {year: year, count: releaseDataObj[year]}
+            releaseDataArr.push(obj);
+        }
+        // expand the data to get the minimum and maximum
+        let extent = d3.extent(releaseDataArr, function (d) {
+            return d.year;
+        });
+        x.domain(extent);
+        //get the range of y
+        let maxY=d3.max(releaseDataArr, function (d) {
+            return d.count;
+        });
+        y.domain([0, maxY]);
+        // Add the valueline path.
+        svg.append("path")
+            .data([releaseDataArr])
+            .attr("class", "line")
+            //use call() to associate the defined axes with the SVG elements.
+            //move the elements so that they look like a coordinate system by setting their transform property
+            .attr("d", valueline);
+        // Add the X Axis
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            //use call() to associate the defined axes with the SVG elements. 
+            //move the elements so that they look like a coordinate system by setting their transform property
+            .call(d3.axisBottom(x).ticks(years.length > 10 ? 10 : years.length));
+        // add the Y Axis
+        let axisY = d3.axisLeft(y);
+        if(maxY<10){
+            axisY.ticks(maxY)
+        }
+        svg.append("g")
+            .call(axisY);
+        svg.selectAll('circle')
+            .data(releaseDataArr)
+            .enter()
+            .append('circle')
+            .attr('cx', function (d) {
+                return x(d.year);
+            })
+            .attr('cy', function (d) {
+                return y(d.count);
+            })
+            .attr('r', 5).attr("fill", 'rgb(231, 117, 79)').on("mouseover", function (e) {
+            console.log(e)
+        }).on("mouseover", function (d) {
+            //set the x and y coordinates of the prompt
+            let xPosition = d.x;
+            let yPosition = d.y-200;;
+            //update the prompt position and value
+            d3.select("#tooltip")
+                .style("left", xPosition + "px")
+                .style("top", yPosition + "px")
+                .select("#tooltip_year")
+                .text(d.target.__data__.year)
+            d3.select("#tooltip").select("#tooltip_count")
+                .text(d.target.__data__.count);
+            //display prompt
+            d3.select("#tooltip").classed("hidden", false);
+        }).on("mouseout", function () {
+            //hide prompt bar
+            d3.select("#tooltip").classed("hidden", true);
+        });
+    }
+</script>
+</body>
+</html>

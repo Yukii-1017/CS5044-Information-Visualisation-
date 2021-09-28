@@ -1,0 +1,401 @@
+<!--Following is for CS5044 P2
+	200024763   19/4/2020
+
+	It can be divided into two parts: the map and the word line. 
+	I give introduction in detail before each part, as well as among the code. 
+
+	Source online: 
+	1. geo map resource: https://raw.githubusercontent.com/AshKyd/geojson-regions/master/countries/110m/all.geojson		
+
+	TO DO: 
+	1. a colourful wordsline 
+	2. add filter to map - a side bar with checkbokes to chose country 
+	3. add a better color scale to map
+	4. bug when hover on the map: twinkling
+	5. report
+	6. sketch
+	7. video
+-->
+
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+  		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title> Director & Country - 200024763</title>
+
+		<!--source online-->
+		<script src="../scripts/geo.js"></script>
+		
+		<!--libraries - d3, bulma, leaflet, topojson, google font-->
+		<script src="https://d3js.org/d3.v5.js"></script>
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
+		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
+		integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="crossorigin=""/>
+		<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"
+		integrity="sha512-QVftwZFqvtRNi0ZyCtsznlKSWOStnDORoefr1enyq5mVL4tmKB3S/EnC3rRJcxCPavG10IcrVGSmPh6Qw5lwrg=="crossorigin=""></script>
+		<script src = 'https://d3js.org/topojson.v1.min.js'></script>
+		<link rel="preconnect" href="https://fonts.gstatic.com">
+		<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@200&display=swap" rel="stylesheet">
+		
+		<!--css style-->
+		<style>			
+			.vis {
+				font-size: larger;
+				margin-left: 20%;
+				margin-top: 4%;
+			}
+			.vis h1{
+				font-size: larger;
+				font-family: 'Raleway', 'Courier New', Courier, monospace;
+			}
+			.vis h2{
+				margin-top: 2%;
+				font-size: medium;
+				font-family: 'Raleway', 'Courier New', Courier, monospace;
+			}
+			#word_cloud, #map
+			{
+				margin-top: 1%;
+				margin-bottom: 4%;
+				align-items: center;
+				width: 800;
+				height: 500;
+			}
+			#place_holder{
+				text-align: center;
+			}
+		</style>
+	</head>
+
+	<!--html dom-->
+	<body>
+		
+		<section class="hero is-dark is-bold">
+			<div class="hero-head">
+				<nav class="navbar">
+					<div class="container">
+						<div class="navbar-brand">
+							<a class="navbar-item">
+								<h1 class="title is-4">CS5044 Information Visualisation</h1>
+							</a>
+						</div>
+						<div class="navbar-menu is-active">
+							<div class="navbar-end">
+								<a href="../index.html" class="navbar-item is-active">
+									Home
+								</a>
+								<a href="160015074.html" class="navbar-item">
+									Directors and Actors - 160015074
+								</a>
+								<a href="200015498.html" class="navbar-item">
+									Director and Genre - 200015498
+								</a>
+								<span class="navbar-item">
+									Director and Country - 200024763
+								</span>
+							</div>
+						</div>
+					</div>
+				</nav>
+			</div>
+			<div class="hero-body pb-5">
+				<div class="container has-text-centered">
+					<p class="title">
+						Director & Country
+					</p>
+				</div>
+			</div>
+		</section>
+		<div class="vis">
+			<h2> <b>Which is the hotest country? </b></h2>
+			<div id = 'map'></div>
+			<h2> <b>Who is the most active director?</b></h2>
+			<div id = 'word_cloud'>
+				<p id = 'place_holder'>Click Map to Show</p>
+			</div>
+		</div>
+
+
+		<!--d3 script-->
+		<script> 
+		var dataPath = "../netflix_titles_clean.csv"
+
+		/**
+		 * Following is the d3 codes. 
+		 * Tt can be divided into three parts for three visualisation - map, world cloud and tree. 
+		 * 
+		 * 
+		 * Part 1: MAP
+		 * 
+		 * The map part is works as an overview by giving the viewer a general clue about the number of directors of each coutry.
+		 * It can be divided into three main parts with three main function: 
+		 * -  Get info about countries by getCountries()
+		 * - Correct The Mismatch by correctCountries()
+		 * - Add the corrected data to  geojson file by L.geoJson()
+		**/
+		
+		//Prepare Leaflet
+		var map = L.map('map').setView([56.2025, 2.4744], 1.5); 
+		L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+			maxZoom: 18,
+			attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+				'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+			id: 'mapbox/light-v9',
+			tileSize: 512,
+			zoomOffset: -1
+		}).addTo(map);
+		
+		d3.csv(dataPath)
+		.then(data=>{
+			console.log('1. original my data',data);
+
+			// Get info about countries - from out chosen dataset
+			var myData = [{'name' : data[0]['country - Split 1'], 'number' : 0}];
+			var getCountries = function() {
+				let couBoxes = data.columns.slice(16,28);
+				for(let i = 0; i < data.length; i++){
+					//get all countries and the number of movie shot in the country for this dataset
+					for(let j = 0; j < couBoxes.length; j++){
+						let  thisCouName = data[i][`${couBoxes[j]}`];
+						if(thisCouName.length > 0 ){
+							let timeCounter = 0;
+							for(let x = 0; x < myData.length; x++){
+								if(myData[x].name == thisCouName){
+									myData[x].number += 1; 
+								}else{
+									timeCounter++;
+								}
+								//because this is in a nested-loop so I can not directly add the new vlaue in the last 'else'
+								// or it will be add myData.length times
+								// the function of the time counter makes sure this data did not appear for the whole loop
+								//then I add it when the last time it appears
+								if(timeCounter == myData.length){
+									myData.push({'name' : thisCouName, 'number' : 1})
+								}
+							}
+						}
+					}
+				}	
+			}
+			getCountries();
+			//console.log(data.columns);
+			console.log( '2. my countries and their times',myData.sort((a,b) => (a.number > b.number) ? 1 : ((b.number > a.number) ? -1 : 0)))
+			//console.log(myData.length) // The number of country I need: 110 
+			//console.log(geoCou.length);// The number of country they have: 177 
+
+
+
+
+			//Correct The Mismatch Of Country Names Between GeoJson File and Our Chosen Dataset
+			var correctCountries = function(data){
+				console.log('3. original geo file', geo);
+				// geo map resource: https://raw.githubusercontent.com/AshKyd/geojson-regions/master/countries/110m/all.geojson		
+				
+				// to find the name in geojson in map by bindPopup
+				/*
+				L.geoJson(geo, {
+					onEachFeature: (feature, layer)=>{
+					layer.bindPopup(feature.properties.admin);
+				},
+				}).addTo(map);
+				*/
+
+				// to get all geonames 
+				let geoNames = [];
+				geo.features.forEach(e => {
+					geoNames.push(e.properties.admin) 
+				});
+				//console.log('geoNames', geoNames)
+			
+				// to compare with our chosen dataset and get all wrong names
+				let nameCounter = 0;
+				let wrongNames = [];
+				myData.forEach(e=>{
+					if(geoNames.includes(e.name)){
+						nameCounter++; 
+					}else{
+						wrongNames.push(e.name)
+					}
+				})		
+				//console.log('old',nameCounter) // 96 match; so 14 need to be corrected 
+				//console.log(wrongNames) // I use the result correct all names as following to correct all names
+				// - there are eight countries or regions are missing in the GeoJson File: Vatican, Bermuda, Samoa, Liechtenstein, Cayman Islands, Malta，Singapore, ; 
+				// - Soviet Union did not exist in the new map so I give the movies to Russia 	
+				// - East Germany，West Germany gives to Germany
+				myData.forEach(e => {
+					if(e.name == 'United States'){
+						e.name = 'United States of America';
+					} 
+					if(e.name == 'Serbia'){
+						e.name = 'Republic of Serbia';
+					} 
+					if(e.name == 'Soviet Union'){
+						e.name = 'Russia';
+					} 
+					if(e.name == 'Bahamas'){
+						e.name = 'The Bahamas';
+					} 
+					if(e.name == 'West Germany' || e.name == 'East Germany'){
+						e.name = 'Germany';
+					} 
+				});	
+
+				let couBoxes = data.columns.slice(16,28);
+				data.forEach(e => {
+					couBoxes.forEach(i => {
+						if(e[`${i}`] == 'United States'){
+							e[`${i}`] = 'United States of America';
+						} 
+						if(e[`${i}`] == 'Serbia'){
+							e[`${i}`] = 'Republic of Serbia';
+						} 
+						if(e[`${i}`] == 'Soviet Union'){
+							e[`${i}`] = 'Russia';
+						} 
+						if(e[`${i}`] == 'Bahamas'){
+							e[`${i}`] = 'The Bahamas';
+						} 
+						if(e.name == 'West Germany' || e.name == 'East Germany'){
+							e.name = 'Germany';
+						} 
+					});
+				});
+
+				//show corrected data
+				let newNameCounter = 0;
+				let newWrongNames = [];
+				myData.forEach(e=>{
+					if(geoNames.includes(e.name)){
+						newNameCounter++; 
+					}else{
+						newWrongNames.push(e.name)
+					}
+				})	
+				//console.log('new',newNameCounter)// this should increase everytime I correct a name 
+				//console.log(newWrongNames)
+
+				// test the results
+				var testNames = [];
+				myData.forEach(element => {
+					testNames.push(element.name) 
+				});
+				//console.log(testNames)
+			}
+			correctCountries(data);
+
+
+
+			// add the corrected data to  geojson file 
+			L.geoJson(geo, {
+				onEachFeature: (feature, layer)=>{	
+					layer.setStyle({
+						'fillColor': 'light grey',
+						'color':'grey',
+						'weight':'1'
+					})		
+					myData.forEach(e => {
+						if(feature.properties.admin == e.name){
+							layer.setStyle({
+								'fillColor': '#FA8714',
+								'fillOpacity': `${e.number/500}`
+							})	
+							layer.bindPopup(`<b>Country Name</b>: ${e.name}<br> <b>Movie Shot Here</b>: ${e.number} <br><br> <i>Click to get more infomation<i>`);
+							layer.on('mouseover', function () {
+								this.setStyle({
+									'fillColor': 'white',
+								});
+								this.openPopup();
+							});
+							layer.on('mouseout', function () {
+								this.setStyle({
+									'fillColor': '#FA8714',
+									'fillOpacity': `${e.number/500}`
+								});
+								this.closePopup();
+							});
+							layer.on('click', function () {
+								//console.log('test',layer)
+								
+								showWordCloud(e, data);
+							});
+						}
+					})
+				}
+			}).addTo(map);
+		})
+		.catch(data=>{
+			//todo: sort the dirctor by alphabet
+			//todo: seperate the column with the same director, and use function to combine them and delete the repeat names.
+			console.log('wrong Map')
+		})
+
+
+
+		/**
+		 * Part 2: WORD
+		 * 
+		 * The wold could give more detail infomation about the single director and a country than the map
+		**/		
+		var showWordCloud = function(e, data){
+			document.getElementById('word_cloud').innerHTML = "";
+
+			//console.log('test',e);
+			let dirBoxes = data.columns.slice(0,13);
+			let couBoxes = data.columns.slice(16,28);
+			let dirWords = [];
+			//e.name is country name in mydata, get director names and the time it appears from data for it - 多个country多个director
+			//i - pick every row of data
+			data.forEach(i => {		
+				for (let country_index = 1; country_index <= 12; country_index++) {
+					if (i[`country - Split ${country_index}`] == e.name) {
+						for (let dir_index = 1; dir_index <= 13; dir_index++) {
+							let director_name = i[`director - Split ${dir_index}`]
+							let director_movies;
+							if ((director_movies = dirWords.find(({ dirName }) => dirName == director_name)) !== undefined) {
+								director_movies.dirCounter++;
+							} else if (director_name.length > 0) {
+								dirWords.push({
+									dirName: director_name,
+									dirCounter: 1
+								})
+							}
+						}
+					}
+				}
+			});
+			
+			d3.select('#word_cloud')
+			.selectAll('p')
+			.data(dirWords)
+			.enter()
+			.append('p')
+				.text(d=>{return d.dirName})
+				.style('font-size',d=>{
+					return (d.dirCounter*10)+'pt';
+				})
+				.style('font-weight', d=>{
+					return d.dirCounter*1000;
+				})	
+		}
+		
+		
+
+		/**
+		 * Part 3: TREE
+		 * 
+		 * based on the word could, the tree visualisation provide the viewer with info about a director in detail 
+		 * Overall, the viewer can get the information they are looking for step by step through the map, word could and the three
+		**/
+
+		/*
+			})
+			.catch(data=>{
+				//todo: sort the dirctor by alphabet
+				//todo: seperate the column with the same director, and use function to combine them and delete the repeat names.
+				console.log('wrong')
+			})
+		*/	
+
+		</script>
+	</body>
+</html>
